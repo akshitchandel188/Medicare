@@ -37,8 +37,7 @@ const Chatbot = ({ onClose }) => {
   const [input, setInput]         = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // conversationHistory is what we send to the backend for multi-turn context.
-  // It follows the Gemini multi-turn format: [{ role, parts: [{ text }] }, ...]
+  // conversationHistory is what we send to the backend for multi-turn context: [{ role, content }, ...]
   const [conversationHistory, setConversationHistory] = useState([]);
 
   const chatEndRef = useRef(null);
@@ -93,11 +92,11 @@ const Chatbot = ({ onClose }) => {
       setMessages(prev => [...prev, botMessage]);
 
       // Update conversation history for multi-turn context.
-      // We append the user's message and the model's reply so follow-up questions work.
+      // We append the user's message and the assistant's reply so follow-up questions work.
       setConversationHistory(prev => [
         ...prev,
-        { role: 'user',  parts: [{ text: userText }] },
-        { role: 'model', parts: [{ text: reply }] },
+        { role: 'user',      content: userText },
+        { role: 'assistant', content: reply },
       ]);
 
     } catch (error) {
@@ -123,7 +122,7 @@ const Chatbot = ({ onClose }) => {
             <FaPills className="chatbot-header-icon" />
             <div>
               <h3>HealthMeds AI Assistant</h3>
-              <span className="chatbot-header-sub">Powered by RAG + Gemini</span>
+              <span className="chatbot-header-sub">Powered by RAG + Groq</span>
             </div>
           </div>
           <button onClick={onClose} className="close-btn" aria-label="Close chat"><FaTimes /></button>

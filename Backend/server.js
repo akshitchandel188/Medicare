@@ -6,11 +6,25 @@ require('dotenv').config();
 const app = express();
 
 // CORS — allow credentials (cookies) from the frontend
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://medicine-delivery-website.vercel.app",
+  process.env.CLIENT_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "https://medicine-delivery-website.vercel.app"
-  ],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin) || allowedOrigins.some(o => origin.startsWith(o))) {
+      return callback(null, true);
+    }
+    // Allow any vercel deployment preview if needed
+    if (process.env.NODE_ENV === 'production' && origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    }
+    return callback(null, true); // Permissive in deployment with credentials
+  },
   credentials: true,
 }));
 

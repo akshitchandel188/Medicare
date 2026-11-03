@@ -8,7 +8,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax',
+  sameSite: process.env.COOKIE_SAMESITE || (process.env.NODE_ENV === 'production' ? 'none' : 'lax'),
   maxAge: 3 * 60 * 60 * 1000,
   path: '/',
 };

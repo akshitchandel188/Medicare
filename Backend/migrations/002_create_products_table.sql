@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS products (
   original_price  NUMERIC(10, 2),
   discount        INTEGER,
   description     TEXT,
-  image           VARCHAR(500),
+  image           TEXT,
   manufacturer    VARCHAR(255),
   stock           INTEGER           DEFAULT 0,
   units_available INTEGER           DEFAULT 0,

@@ -14,7 +14,7 @@ A production-grade, full-stack online pharmacy and medicine delivery platform bu
 * **Delivery Security PIN (OTP):** Dynamic 4-digit PIN generated upon dispatch to ensure medicines are only handed over to verified patients.
 
 ### 🤖 2. AI Medical Assistant (RAG Chatbot)
-* **Retrieval-Augmented Generation (RAG):** Powered by Google Gemini (`gemini-embedding-001` + `gemini-1.5-flash`) and PostgreSQL `pgvector`.
+* **Retrieval-Augmented Generation (RAG):** Powered by Groq AI (`openai/gpt-oss-120b` / `qwen/qwen3.8-27b`) and PostgreSQL knowledge retrieval.
 * **Semantic Knowledge Retrieval:** Cosine similarity search across chunked medicine monographs, dosage guidelines, precautions, and wellness blogs.
 * **Live Inventory Integration:** Real-time price and stock lookup directly from the database during conversational queries.
 * **Safe Medical Disclaimers:** Automatic verification badges and emergency consult reminders.
@@ -68,7 +68,7 @@ Medicine-Delivery-App/
 │   │   └── users.js                     # Authentication (login, signup, session)
 │   ├── db.js                            # PostgreSQL pool connection
 │   ├── migrate.js                       # Migration runner
-│   ├── Server.js                        # Express server entry point
+│   ├── server.js                        # Express server entry point
 │   └── package.json
 │
 ├── Frontend/
@@ -107,7 +107,7 @@ Medicine-Delivery-App/
 
 * **Frontend:** React 19, Vite, React Router 7, React Icons, Vanilla CSS (Design Tokens & Glassmorphism).
 * **Backend:** Node.js, Express, `pg` (PostgreSQL client), `jsonwebtoken`, `bcryptjs`, `cookie-parser`, `multer`.
-* **AI & Search:** Google Gemini API (`@google/genai`), PostgreSQL `pgvector` extension for vector embeddings.
+* **AI & Search:** Groq API (`groq-sdk`), PostgreSQL knowledge base & `pgvector`.
 * **Database:** PostgreSQL 15+ / 16+.
 
 ---
@@ -127,8 +127,9 @@ DB_DATABASE=medicine_delivery
 DB_PASSWORD=your_postgres_password
 DB_PORT=5432
 
-# Gemini AI (for RAG Chatbot)
-GEMINI_API_KEY=your_gemini_api_key
+# Groq AI (for RAG Chatbot)
+GROQ_API_KEY=your_groq_api_key
+GROQ_MODEL=openai/gpt-oss-120b
 ```
 
 ### Frontend (`Frontend/.env`)

@@ -33,15 +33,14 @@ const { GoogleGenerativeAI, TaskType } = require('@google/generative-ai');
 const pool = require('../db');
 
 // ─── AI Client Setup ─────────────────────────────────────────────────────────
-if (!process.env.GEMINI_API_KEY) {
-  console.error('ERROR: GEMINI_API_KEY is not set in .env');
-  process.exit(1);
+let embeddingModel = null;
+if (process.env.GEMINI_API_KEY) {
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  // gemini-embedding-001 produces 3072-dimensional embeddings
+  embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
+} else {
+  console.log('ℹ Notice: GEMINI_API_KEY not found. Chunks will be ingested with text and metadata for keyword RAG search (powered by Groq completions).');
 }
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// gemini-embedding-001 produces 3072-dimensional embeddings
-const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 // Free tier limit: 100 embed requests/minute.
@@ -256,6 +255,11 @@ async function generateEmbedding(text, attempt = 0) {
 // Process chunks one at a time (sequential) to stay under the 100 req/min free tier limit.
 // 700ms between requests ≈ 85 requests/min — safely under the limit.
 async function generateEmbeddingsInBatches(chunks) {
+  if (!embeddingModel) {
+    log.warn('No Gemini embedding model configured. Ingesting chunks for text search without vector embeddings.');
+    return chunks.map(chunk => ({ ...chunk, embedding: null }));
+  }
+
   const results = [];
 
   for (let i = 0; i < chunks.length; i++) {
@@ -279,8 +283,7 @@ async function storeChunks(client, chunks, sourceLabel) {
   log.info(`Storing ${chunks.length} ${sourceLabel} chunks…`);
 
   for (const chunk of chunks) {
-    // Format the 3072-dim array as a PostgreSQL vector literal: '[0.1, 0.2, ...]'
-    const vectorLiteral = `[${chunk.embedding.join(',')}]`;
+    const vectorLiteral = Array.isArray(chunk.embedding) ? `[${chunk.embedding.join(',')}]` : null;
 
     await client.query(
       `INSERT INTO knowledge_chunks

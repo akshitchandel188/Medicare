@@ -9,8 +9,8 @@ const authMiddleware = require('../middleware/authMiddleware');
 const COOKIE_OPTIONS = {
   httpOnly: true,          // JS cannot access this cookie (XSS protection)
   secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-  sameSite: 'lax',         // CSRF protection
-  maxAge: 3 * 60 * 60 * 1000, // 3 hours in milliseconds — auto-deleted by browser after this
+  sameSite: process.env.COOKIE_SAMESITE || (process.env.NODE_ENV === 'production' ? 'none' : 'lax'), // 'none' required for cross-domain (Vercel <-> Render)
+  maxAge: 3 * 60 * 60 * 1000, // 3 hours in milliseconds
   path: '/',
 };
 

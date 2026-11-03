@@ -186,7 +186,7 @@ async function searchLiveProducts(message) {
 
   // Extract words that might be product names (>3 chars, not stopwords)
   const words = lower
-    .replace(/[₹\(\)]/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter(w => w.length > 3 && !stopwords.has(w));
 

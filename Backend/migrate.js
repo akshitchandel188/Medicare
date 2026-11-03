@@ -43,12 +43,14 @@ async function runMigrations() {
   log.title('🏥  Medicine Delivery App — Database Migrations');
 
   // Validate required env vars
-  const required = ['DB_USER', 'DB_HOST', 'DB_DATABASE', 'DB_PASSWORD', 'DB_PORT'];
-  const missing  = required.filter((k) => !process.env[k]);
-  if (missing.length) {
-    log.error(`Missing environment variables: ${missing.join(', ')}`);
-    log.error('Create a .env file in the Backend folder (see .env.example).');
-    process.exit(1);
+  if (!process.env.DATABASE_URL) {
+    const required = ['DB_USER', 'DB_HOST', 'DB_DATABASE', 'DB_PASSWORD', 'DB_PORT'];
+    const missing  = required.filter((k) => !process.env[k]);
+    if (missing.length) {
+      log.error(`Missing environment variables: ${missing.join(', ')}`);
+      log.error('Set DATABASE_URL or discrete DB_* variables in .env');
+      process.exit(1);
+    }
   }
 
   // const pool = new Pool({

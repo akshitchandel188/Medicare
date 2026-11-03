@@ -1,8 +1,6 @@
 /**
- * routes/chat.js — RAG-Powered Chat Route
- * ========================================
- *
- * This replaces the simple inline /api/chat handler in Server.js.
+ * routes/chat.js — RAG-Powered Chat Route (Groq AI)
+ * ===================================================
  *
  * New Request Flow:
  *   POST /api/chat
@@ -10,15 +8,15 @@
  *
  *   1. Validate inputs
  *   2. In PARALLEL:
- *      A. RAG retrieval — semantic search in knowledge_chunks via pgvector
+ *      A. RAG retrieval — semantic/keyword search in knowledge_chunks via PostgreSQL
  *      B. Live product search — direct SQL on products table (if it looks like a product query)
- *   3. Build a grounded Gemini prompt with retrieved context
- *   4. Send to Gemini with conversation history (multi-turn support)
+ *   3. Build a grounded system prompt with retrieved context and live products
+ *   4. Send to Groq with conversation history (multi-turn support)
  *   5. Return { reply, sources, products }
  *
  * Response Shape:
  *   {
- *     reply:    string,              // Gemini's grounded answer
+ *     reply:    string,              // Groq's grounded answer
  *     sources:  Array<{ name, type }>,  // Citations from knowledge base
  *     products: Array<ProductRow>    // Live products from PostgreSQL (may be empty)
  *   }
@@ -26,17 +24,20 @@
 
 'use strict';
 
-const express  = require('express');
-const router   = express.Router();
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const express = require('express');
+const router  = express.Router();
+const Groq    = require('groq-sdk');
 
-const { retrieve }                         = require('../rag/retriever');
+const { retrieve }                                 = require('../rag/retriever');
 const { searchLiveProducts, isProductSearchQuery } = require('../rag/productSearch');
 
-// ─── Gemini Setup ─────────────────────────────────────────────────────────────
-const genAI = process.env.GEMINI_API_KEY
-  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-  : null;
+// ─── Groq Setup ───────────────────────────────────────────────────────────────
+const apiKey = process.env.GROQ_API_KEY;
+const groq = apiKey ? new Groq({ apiKey }) : null;
+
+// Preferred model from environment or high-quality default
+const PRIMARY_MODEL  = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+const FALLBACK_MODEL = 'qwen/qwen3.8-27b';
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 // How many knowledge chunks to retrieve per query
@@ -48,10 +49,10 @@ const MAX_HISTORY_TURNS = 3;
 
 // ─── Prompt Builder ───────────────────────────────────────────────────────────
 /**
- * Builds the grounded system prompt for Gemini.
+ * Builds the grounded system prompt for Groq.
  *
  * Key design decisions:
- * - Retrieved chunks are labeled clearly so Gemini knows they come from HealthMeds KB
+ * - Retrieved chunks are labeled clearly so Groq knows they come from HealthMeds KB
  * - Live products are clearly separated from KB content
  * - Rules explicitly prevent hallucination of product details
  * - Medical safety rules are non-negotiable constraints
@@ -123,17 +124,46 @@ function containsSymptoms(message) {
   return symptomIndicators.some(phrase => lower.includes(phrase));
 }
 
+// ─── History Normalizer ───────────────────────────────────────────────────────
+/**
+ * Normalizes history from multiple formats:
+ * - OpenAI/Groq: { role: 'user' | 'assistant', content: string }
+ * - Gemini:      { role: 'user' | 'model', parts: [{ text: string }] }
+ * - UI:          { sender: 'user' | 'bot', text: string }
+ */
+function normalizeHistory(rawHistory) {
+  if (!Array.isArray(rawHistory)) return [];
+
+  return rawHistory.map(item => {
+    let role = 'user';
+    if (item.role === 'model' || item.role === 'assistant' || item.sender === 'bot') {
+      role = 'assistant';
+    }
+
+    let content = '';
+    if (typeof item.content === 'string') {
+      content = item.content;
+    } else if (Array.isArray(item.parts)) {
+      content = item.parts.map(p => p.text || '').join('');
+    } else if (typeof item.text === 'string') {
+      content = item.text;
+    }
+
+    return { role, content: content.trim() };
+  }).filter(entry => entry.content.length > 0);
+}
+
 // ─── Main Chat Route ──────────────────────────────────────────────────────────
 router.post('/', async (req, res) => {
-  if (!genAI) {
+  if (!groq) {
     return res.status(503).json({
-      error: 'AI Service is not configured. Please add GEMINI_API_KEY to .env file.',
+      error: 'AI Service is not configured. Please add GROQ_API_KEY to .env file.',
     });
   }
 
-  const { message, conversationHistory, history, } = req.body;
-  // Accept both 'history' (Chatbot.jsx) and 'conversationHistory' field names
-  const chatHistory = conversationHistory || history || [];
+  const { message, conversationHistory, history } = req.body;
+  // Accept both 'history' and 'conversationHistory' field names
+  const rawHistory = conversationHistory || history || [];
 
   if (!message || typeof message !== 'string' || !message.trim()) {
     return res.status(400).json({ error: 'Message is required.' });
@@ -163,33 +193,48 @@ router.post('/', async (req, res) => {
     // ── Step 2: Build grounded prompt ────────────────────────────────────────
     const systemPrompt = buildSystemPrompt(retrievedChunks, liveProducts);
 
-    // ── Step 3: Prepare conversation history for Gemini multi-turn ───────────
-    // Trim to last MAX_HISTORY_TURNS exchanges to prevent prompt overflow
-    const recentHistory = chatHistory.slice(-(MAX_HISTORY_TURNS * 2));
+    // ── Step 3: Prepare conversation history for multi-turn ──────────────────
+    const normalized = normalizeHistory(rawHistory);
+    const recentHistory = normalized.slice(-(MAX_HISTORY_TURNS * 2));
 
-    // ── Step 4: Call Gemini with multi-turn support ───────────────────────────
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-3.6-flash',
-      systemInstruction: systemPrompt,
-    });
-
-    const chat = model.startChat({ history: recentHistory });
-
-    // Append symptom safety reminder to the message if needed
+    // Append symptom safety reminder to the user message if needed
     let userMessageText = cleanMessage;
     if (containsSymptoms(cleanMessage)) {
       userMessageText += '\n\n(Please include a reminder that I should consult a doctor for personalized medical advice.)';
     }
 
-    const result = await chat.sendMessage(userMessageText);
-    const reply  = result.response.text();
+    // ── Step 4: Assemble Groq messages ───────────────────────────────────────
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...recentHistory,
+      { role: 'user', content: userMessageText },
+    ];
 
-    // ── Step 5: Build source citations ────────────────────────────────────────
-    // Deduplicate sources by source_name (multiple chunks from same medicine)
+    // ── Step 5: Call Groq with model fallback ─────────────────────────────────
+    let reply = '';
+    try {
+      const completion = await groq.chat.completions.create({
+        model: PRIMARY_MODEL,
+        messages,
+        temperature: 0.4,
+        max_tokens: 1024,
+      });
+      reply = completion.choices[0]?.message?.content || '';
+    } catch (primaryErr) {
+      console.warn(`[Groq] Primary model ${PRIMARY_MODEL} failed, retrying with ${FALLBACK_MODEL}:`, primaryErr.message);
+      const fallbackCompletion = await groq.chat.completions.create({
+        model: FALLBACK_MODEL,
+        messages,
+        temperature: 0.4,
+        max_tokens: 1024,
+      });
+      reply = fallbackCompletion.choices[0]?.message?.content || '';
+    }
+
+    // ── Step 6: Build source citations ────────────────────────────────────────
     const seenSources = new Set();
     const sources = [];
     for (const chunk of retrievedChunks) {
-      // Show the medicine/article name without the chunk-type suffix for cleaner citations
       const citationName = chunk.source_name;
       if (!seenSources.has(citationName)) {
         seenSources.add(citationName);
@@ -202,7 +247,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // ── Step 6: Return structured response ───────────────────────────────────
+    // ── Step 7: Return structured response ───────────────────────────────────
     res.json({
       reply,
       sources,

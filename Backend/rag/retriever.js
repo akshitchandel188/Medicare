@@ -1,84 +1,58 @@
 /**
- * rag/retriever.js — Semantic Retrieval Module
- * =============================================
+ * rag/retriever.js — Semantic & Text Retrieval Module
+ * =====================================================
  *
  * This is the core of the RAG pipeline's "R" (Retrieval) step.
  *
  * How it works:
  *   1. Takes the user's natural-language query
- *   2. Generates a 3072-dim embedding using Gemini gemini-embedding-001
- *      with TaskType.RETRIEVAL_QUERY (different from RETRIEVAL_DOCUMENT used at ingestion)
- *   3. Runs a pgvector cosine similarity search against knowledge_chunks
- *   4. Returns the top-K most semantically similar chunks with their metadata
- *
- * Why cosine similarity?
- *   Embeddings are high-dimensional vectors. Cosine similarity measures the
- *   ANGLE between two vectors (ignoring magnitude). Two semantically similar
- *   texts point in the same "direction" in embedding space, so cosine
- *   similarity is near 1.0. Unrelated texts point in different directions.
- *
- * Why use RETRIEVAL_QUERY for queries and RETRIEVAL_DOCUMENT for documents?
- *   Gemini gemini-embedding-001 is a "bi-encoder" model trained with task hints.
- *   Using the correct task type optimises the embedding for its intended use,
- *   improving retrieval precision.
+ *   2. If vector embedding service is configured (GEMINI_API_KEY):
+ *      - Generates an embedding for the query
+ *      - Runs pgvector cosine similarity search against knowledge_chunks
+ *   3. If vector embedding service is not configured (or fails):
+ *      - Gracefully falls back to full-text and keyword search in knowledge_chunks
+ *   4. Returns top-K matching chunks with their metadata
  */
 
 'use strict';
 
 require('dotenv').config();
-const { GoogleGenerativeAI, TaskType } = require('@google/generative-ai');
 const pool = require('../db');
 
 // ─── Configuration ────────────────────────────────────────────────────────────
-// Default number of chunks to retrieve per query.
-// Increasing K gives more context but uses more tokens in the Gemini prompt.
-const DEFAULT_TOP_K = 4;
-
-// Minimum similarity score to include a chunk (0 = include everything, 1 = exact match)
-// 0.5 is a reasonable threshold — below this, chunks are usually noise.
+const DEFAULT_TOP_K  = 4;
 const MIN_SIMILARITY = 0.35;
 
-// ─── AI Client Setup ─────────────────────────────────────────────────────────
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
+// Optional Gemini embedding client
+let embeddingModel = null;
+if (process.env.GEMINI_API_KEY) {
+  try {
+    const { GoogleGenerativeAI } = require('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    embeddingModel = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
+  } catch (err) {
+    console.warn('[Retriever] Could not initialize Gemini embedding client:', err.message);
+  }
+}
 
-// ─── Embed the user's query ───────────────────────────────────────────────────
-/**
- * Generates an embedding for the user's query.
- * Note: TaskType.RETRIEVAL_QUERY (not RETRIEVAL_DOCUMENT) — this is intentional.
- * The model uses slightly different vector spaces for documents vs queries.
- */
+// ─── Vector Query Embedding ───────────────────────────────────────────────────
 async function embedQuery(queryText) {
+  if (!embeddingModel) return null;
+  const { TaskType } = require('@google/generative-ai');
   const result = await embeddingModel.embedContent({
     content: { parts: [{ text: queryText }], role: 'user' },
     taskType: TaskType.RETRIEVAL_QUERY,
   });
-  return result.embedding.values; // 3072-dimensional float array
+  return result.embedding.values;
 }
 
-// ─── Vector similarity search ─────────────────────────────────────────────────
-/**
- * Performs cosine similarity search on the knowledge_chunks table.
- *
- * The <=> operator is pgvector's cosine distance operator.
- * Cosine distance = 1 - cosine_similarity, so ORDER BY ASC gives most similar first.
- * We convert to similarity score: similarity = 1 - distance
- *
- * @param {string} queryText - The user's question
- * @param {object} options
- * @param {number} [options.topK=4] - Number of chunks to return
- * @param {string} [options.sourceType] - Optional filter by source_type
- * @returns {Array} Array of chunk objects with content, metadata, similarity
- */
-async function retrieve(queryText, { topK = DEFAULT_TOP_K, sourceType = null } = {}) {
-  // Step 1: Embed the query
+// ─── Vector Similarity Search (pgvector) ──────────────────────────────────────
+async function retrieveByVector(queryText, { topK = DEFAULT_TOP_K, sourceType = null } = {}) {
   const queryEmbedding = await embedQuery(queryText);
+  if (!queryEmbedding) return [];
 
-  // Step 2: Format as PostgreSQL vector literal
   const vectorLiteral = `[${queryEmbedding.join(',')}]`;
 
-  // Step 3: Cosine similarity search
-  // (1 - (embedding <=> query_vector)) converts distance to similarity score
   let query = `
     SELECT
       id,
@@ -90,12 +64,11 @@ async function retrieve(queryText, { topK = DEFAULT_TOP_K, sourceType = null } =
       metadata,
       1 - (embedding <=> $1::vector) AS similarity
     FROM knowledge_chunks
-    WHERE 1 - (embedding <=> $1::vector) > $2
+    WHERE embedding IS NOT NULL AND (1 - (embedding <=> $1::vector)) > $2
   `;
 
   const params = [vectorLiteral, MIN_SIMILARITY];
 
-  // Optional filter by source type (e.g., only blog articles)
   if (sourceType) {
     params.push(sourceType);
     query += ` AND source_type = $${params.length}`;
@@ -106,7 +79,6 @@ async function retrieve(queryText, { topK = DEFAULT_TOP_K, sourceType = null } =
 
   const result = await pool.query(query, params);
 
-  // Step 4: Return chunks with similarity scores
   return result.rows.map((row) => ({
     id:          row.id,
     content:     row.content,
@@ -117,6 +89,91 @@ async function retrieve(queryText, { topK = DEFAULT_TOP_K, sourceType = null } =
     metadata:    row.metadata,
     similarity:  parseFloat(row.similarity.toFixed(4)),
   }));
+}
+
+// ─── Text / Keyword Search Fallback ───────────────────────────────────────────
+async function retrieveByText(queryText, { topK = DEFAULT_TOP_K, sourceType = null } = {}) {
+  const stopWords = new Set([
+    'what', 'when', 'where', 'which', 'who', 'whom', 'this', 'that', 'with', 'from',
+    'have', 'does', 'about', 'some', 'tell', 'show', 'give', 'please', 'help', 'want',
+    'need', 'find', 'more', 'much', 'many', 'good', 'take', 'used', 'side', 'effects'
+  ]);
+
+  const rawKeywords = queryText
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length >= 3);
+
+  // Separate non-stopwords and fallback to all words if none remain
+  let keywords = rawKeywords.filter(w => !stopWords.has(w));
+  if (keywords.length === 0) {
+    keywords = rawKeywords;
+  }
+  if (keywords.length === 0) return [];
+
+  const conditions = [];
+  const params = [];
+
+  keywords.slice(0, 5).forEach((kw) => {
+    params.push(`%${kw}%`);
+    const idx = params.length;
+    conditions.push(`(source_name ILIKE $${idx} OR content ILIKE $${idx} OR category ILIKE $${idx})`);
+  });
+
+  let query = `
+    SELECT
+      id,
+      content,
+      source_type,
+      source_id,
+      source_name,
+      category,
+      metadata,
+      0.85 AS similarity
+    FROM knowledge_chunks
+    WHERE (${conditions.join(' OR ')})
+  `;
+
+  if (sourceType) {
+    params.push(sourceType);
+    query += ` AND source_type = $${params.length}`;
+  }
+
+  params.push(topK);
+  query += ` LIMIT $${params.length}`;
+
+  const result = await pool.query(query, params);
+
+  return result.rows.map((row) => ({
+    id:          row.id,
+    content:     row.content,
+    source_type: row.source_type,
+    source_id:   row.source_id,
+    source_name: row.source_name,
+    category:    row.category,
+    metadata:    row.metadata,
+    similarity:  0.85,
+  }));
+}
+
+// ─── Main Retrieve Function ───────────────────────────────────────────────────
+async function retrieve(queryText, options = {}) {
+  if (embeddingModel) {
+    try {
+      const vectorResults = await retrieveByVector(queryText, options);
+      if (vectorResults.length > 0) return vectorResults;
+    } catch (err) {
+      console.warn('[RAG Retriever] Vector retrieval error, falling back to text:', err.message);
+    }
+  }
+
+  try {
+    return await retrieveByText(queryText, options);
+  } catch (err) {
+    console.error('[RAG Retriever] Retrieval failed:', err.message);
+    return [];
+  }
 }
 
 module.exports = { retrieve };

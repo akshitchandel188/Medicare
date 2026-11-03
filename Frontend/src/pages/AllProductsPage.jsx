@@ -3,6 +3,7 @@ import './AllProductsPage.css';
 import { Link, useSearchParams } from 'react-router-dom';
 import ProductCard from '../components/ProductCard/ProductCard';
 import { BsArrowLeft } from 'react-icons/bs';
+import API from '../config/api';
 
 const AllProductsPage = () => {
   const [searchParams] = useSearchParams();
@@ -18,7 +19,7 @@ const AllProductsPage = () => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/products`);
+        const response = await fetch(`${API}/api/products`);
         if (response.ok) {
           const data = await response.json();
           setProducts(data);

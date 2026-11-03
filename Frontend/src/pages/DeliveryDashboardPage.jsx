@@ -21,8 +21,7 @@ import {
 } from 'react-icons/fa';
 import { BsArrowLeft } from 'react-icons/bs';
 import './DeliveryDashboardPage.css';
-
-const API = import.meta.env.VITE_API_URL;
+import API from '../config/api';
 
 const DeliveryDashboardPage = () => {
   const { user, logout } = useAuth();

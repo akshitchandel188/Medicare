@@ -1,9 +1,18 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
+import API from '../config/api';
 
 const AuthContext = createContext(null);
 
-const API = import.meta.env.VITE_API_URL;
+// Safely parse JSON from a response, avoiding "unexpected end of data" SyntaxError
+const safeJson = async (res) => {
+  try {
+    const text = await res.text();
+    return text ? JSON.parse(text) : {};
+  } catch (err) {
+    return { message: res.statusText || 'Unexpected server response' };
+  }
+};
 
 // All fetch calls use credentials: 'include' so the browser automatically
 // sends the HTTP-only auth cookie with every request.
@@ -36,8 +45,8 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authFetch(`${API}/api/orders`);
       if (response.ok) {
-        const data = await response.json();
-        setOrders(data);
+        const data = await safeJson(response);
+        setOrders(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error('Failed to fetch orders:', error);
@@ -49,8 +58,8 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authFetch(`${API}/api/addresses`);
       if (response.ok) {
-        const data = await response.json();
-        setAddresses(data);
+        const data = await safeJson(response);
+        setAddresses(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error('Failed to fetch addresses:', error);
@@ -64,7 +73,7 @@ export const AuthProvider = ({ children }) => {
       try {
         const response = await authFetch(`${API}/api/users/me`);
         if (response.ok) {
-          const data = await response.json();
+          const data = await safeJson(response);
           setUser(data.user);
           // Load user-specific data in parallel
           fetchOrders();
@@ -100,20 +109,20 @@ export const AuthProvider = ({ children }) => {
     });
 
     if (response.ok) {
-      const data = await response.json();
+      const data = await safeJson(response);
       setUser(data.user);
       // Load user data after login
       fetchOrders();
       fetchAddresses();
 
-      if (data.user.role === 'delivery') {
+      if (data.user && data.user.role === 'delivery') {
         navigate('/delivery/dashboard');
       } else {
         navigate('/');
       }
     } else {
-      const errorData = await response.json();
-      throw new Error(errorData.message);
+      const errorData = await safeJson(response);
+      throw new Error(errorData.message || 'Login failed');
     }
   };
 
@@ -124,12 +133,12 @@ export const AuthProvider = ({ children }) => {
     });
 
     if (response.ok) {
-      const data = await response.json();
+      const data = await safeJson(response);
       setUser(data.user);
       navigate('/delivery/dashboard');
       return data;
     } else {
-      const errorData = await response.json();
+      const errorData = await safeJson(response);
       throw new Error(errorData.message || 'Registration failed.');
     }
   };
@@ -141,12 +150,12 @@ export const AuthProvider = ({ children }) => {
     });
 
     if (response.ok) {
-      const data = await response.json();
+      const data = await safeJson(response);
       setUser(data.user);
       navigate('/delivery/dashboard');
       return data;
     } else {
-      const errorData = await response.json();
+      const errorData = await safeJson(response);
       throw new Error(errorData.message || 'Delivery login failed.');
     }
   };
@@ -168,12 +177,12 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await safeJson(response);
         throw new Error(errorData.message || 'Failed to add address.');
       }
 
       await fetchAddresses();
-      return await response.json();
+      return await safeJson(response);
     } catch (error) {
       console.error('Error adding address:', error);
       throw error;

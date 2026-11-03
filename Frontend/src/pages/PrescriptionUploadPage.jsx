@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import './PrescriptionUploadPage.css';
 import { FaUpload, FaFileImage, FaFilePdf, FaTimes, FaCheckCircle } from 'react-icons/fa';
 import { BsFileEarmarkMedicalFill } from 'react-icons/bs';
+import API from '../config/api';
 
 const PrescriptionUploadPage = () => {
     const navigate = useNavigate();
@@ -65,7 +66,7 @@ const PrescriptionUploadPage = () => {
             formData.append('prescription', selectedFile);
 
             // TODO: Replace with actual API endpoint
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/prescriptions/upload`, {
+            const response = await fetch(`${API}/api/prescriptions/upload`, {
                 method: 'POST',
                 body: formData,
                 headers: {

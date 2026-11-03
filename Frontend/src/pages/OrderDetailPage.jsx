@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import './OrderDetailPage.css';
 import { BsArrowLeft, BsCheckCircle, BsClock, BsTruck, BsBox } from 'react-icons/bs';
 import MockOrderTrackingMap from '../components/OrderTrackingMap/MockOrderTrackingMap';
+import API from '../config/api';
 
 const OrderDetailPage = () => {
     const { orderId } = useParams();
@@ -14,7 +15,7 @@ const OrderDetailPage = () => {
     useEffect(() => {
         const fetchOrderDetails = async () => {
             try {
-                const response = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}`, {
+                const response = await fetch(`${API}/api/orders/${orderId}`, {
                     credentials: 'include',
                 });
 

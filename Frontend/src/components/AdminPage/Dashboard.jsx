@@ -16,8 +16,7 @@ import {
   FaTruck
 } from 'react-icons/fa';
 import './Dashboard.css';
-
-const API = import.meta.env.VITE_API_URL;
+import API from '../../config/api';
 
 const Dashboard = () => {
   const [analytics, setAnalytics] = useState(null);

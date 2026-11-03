@@ -3,6 +3,7 @@ import { FaPlus, FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
 import AddMedicineModal from './AddMedicineModal';
 import EditMedicineModal from './EditMedicineModal';
 import './ManageMedicines.css';
+import API from '../../config/api';
 
 const ManageMedicines = () => {
   const [medicines, setMedicines] = useState([]);
@@ -20,7 +21,7 @@ const ManageMedicines = () => {
   const fetchMedicines = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/products`);
+      const response = await fetch(`${API}/api/admin/products`);
       if (response.ok) {
         const data = await response.json();
         setMedicines(data);
@@ -36,7 +37,7 @@ const ManageMedicines = () => {
 
   const handleAddMedicine = async (newMedicine) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/products`, {
+      const response = await fetch(`${API}/api/admin/products`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -72,7 +73,7 @@ const ManageMedicines = () => {
 
   const handleUpdateMedicine = async (updatedMedicine) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/products/${updatedMedicine.id}`, {
+      const response = await fetch(`${API}/api/admin/products/${updatedMedicine.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -113,7 +114,7 @@ const ManageMedicines = () => {
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/products/${medicineId}`, {
+      const response = await fetch(`${API}/api/admin/products/${medicineId}`, {
         method: 'DELETE'
       });
 

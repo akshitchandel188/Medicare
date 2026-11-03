@@ -45,7 +45,7 @@ router.post('/', authMiddleware, async (req, res) => {
     // If anything fails, roll back the transaction
     await client.query('ROLLBACK');
     console.error(err.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ message: 'Server Error' });
   } finally {
     // Release the client back to the pool
     client.release();
@@ -60,7 +60,7 @@ router.get('/', authMiddleware, async (req, res) => {
     res.json(userOrders.rows);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ message: 'Server Error' });
   }
 });
 
@@ -106,7 +106,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
     res.json(orderDetails);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ message: 'Server Error' });
   }
 });
 

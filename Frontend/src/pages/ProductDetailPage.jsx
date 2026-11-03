@@ -6,6 +6,7 @@ import { useCart } from '../context/CartContext';
 // Import Icons
 import { BsArrowLeft, BsFileEarmarkMedicalFill } from 'react-icons/bs';
 import { FaStar, FaHeart, FaExclamationTriangle, FaCheckCircle, FaBox, FaShippingFast } from 'react-icons/fa';
+import API from '../config/api';
 
 const ProductDetailPage = () => {
   const { productId } = useParams();
@@ -20,7 +21,7 @@ const ProductDetailPage = () => {
     const fetchProduct = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/products/${productId}`);
+        const response = await fetch(`${API}/api/products/${productId}`);
         if (response.ok) {
           const data = await response.json();
           setProduct(data);

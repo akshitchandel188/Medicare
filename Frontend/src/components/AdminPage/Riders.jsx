@@ -11,6 +11,7 @@ import {
   FaSyncAlt
 } from 'react-icons/fa';
 import './Riders.css';
+import API from '../../config/api';
 
 const Riders = () => {
   const [riders, setRiders] = useState([]);
@@ -24,7 +25,7 @@ const Riders = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/riders`);
+      const response = await fetch(`${API}/api/admin/riders`);
       if (!response.ok) {
         throw new Error('Failed to fetch delivery partners');
       }
@@ -45,7 +46,7 @@ const Riders = () => {
   const handleToggleApproval = async (userId) => {
     try {
       setActionLoading(true);
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/riders/${userId}/toggle-approval`, {
+      const res = await fetch(`${API}/api/admin/riders/${userId}/toggle-approval`, {
         method: 'PUT'
       });
       if (res.ok) {
@@ -66,7 +67,7 @@ const Riders = () => {
   const handleToggleBlock = async (userId) => {
     try {
       setActionLoading(true);
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/riders/${userId}/toggle-block`, {
+      const res = await fetch(`${API}/api/admin/riders/${userId}/toggle-block`, {
         method: 'PUT'
       });
       if (res.ok) {

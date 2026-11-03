@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FaEdit, FaSearch, FaMotorcycle, FaCheckCircle, FaTimes, FaShieldAlt } from 'react-icons/fa';
 import StatusModal from './StatusModal';
 import './Orders.css';
+import API from '../../config/api';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -21,7 +22,7 @@ const Orders = () => {
   // 1. Fetch Orders from Backend
   const fetchOrders = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/orders`);
+      const response = await fetch(`${API}/api/admin/orders`);
       if (!response.ok) {
         throw new Error('Failed to fetch orders');
       }
@@ -37,7 +38,7 @@ const Orders = () => {
   // Fetch registered riders for the assignment dropdown
   const fetchRiders = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/riders`);
+      const response = await fetch(`${API}/api/admin/riders`);
       if (response.ok) {
         const data = await response.json();
         setRiders(data);
@@ -55,7 +56,7 @@ const Orders = () => {
   // 2. Update Order Status Function
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/orders/${orderId}/status`, {
+      const response = await fetch(`${API}/api/admin/orders/${orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -84,7 +85,7 @@ const Orders = () => {
 
     try {
       setAssignLoading(true);
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/orders/${orderToAssign.id}/assign-rider`, {
+      const res = await fetch(`${API}/api/admin/orders/${orderToAssign.id}/assign-rider`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deliveryPartnerId: selectedRiderId })

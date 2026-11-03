@@ -50,7 +50,13 @@ const SignUpPage = () => {
         password: formData.password
       });
 
-      const data = await response.json();
+      let data = {};
+      try {
+        const text = await response.text();
+        data = text ? JSON.parse(text) : {};
+      } catch (parseErr) {
+        data = { message: 'Unexpected response from server. Please verify backend service.' };
+      }
 
       if (!response.ok) {
         throw new Error(data.message || 'Failed to create account.');

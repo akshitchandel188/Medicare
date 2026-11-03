@@ -130,7 +130,7 @@ router.get('/analytics', async (req, res) => {
         });
     } catch (err) {
         console.error("Error in /analytics route:", err);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 
@@ -145,7 +145,7 @@ router.get('/users', async (req, res) => {
         res.json(allUsers.rows);
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 
@@ -156,7 +156,7 @@ router.put('/users/:id/block', async (req, res) => {
         res.json({ message: "User blocked successfully." });
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 
@@ -167,7 +167,7 @@ router.put('/users/:id/unblock', async (req, res) => {
         res.json({ message: "User unblocked successfully." });
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 
@@ -198,7 +198,7 @@ router.get('/orders', async (req, res) => {
         res.json(allOrders.rows);
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 
@@ -210,7 +210,7 @@ router.put('/orders/:id/status', async (req, res) => {
         res.json({ message: "Order status updated." });
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 
@@ -245,7 +245,7 @@ router.put('/orders/:id/assign-rider', async (req, res) => {
         });
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 
@@ -273,7 +273,7 @@ router.get('/riders', async (req, res) => {
         res.json(result.rows);
     } catch (err) {
         console.error("Error fetching riders for admin:", err);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 
@@ -290,7 +290,7 @@ router.put('/riders/:id/toggle-approval', async (req, res) => {
         res.json({ message: "Rider approval status updated.", is_approved: result.rows[0]?.is_approved });
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 
@@ -307,7 +307,7 @@ router.put('/riders/:id/toggle-block', async (req, res) => {
         res.json({ message: "Rider status updated.", is_blocked: result.rows[0]?.is_blocked });
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 
@@ -320,7 +320,7 @@ router.get('/products', async (req, res) => {
         res.json(allProducts.rows);
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 
@@ -348,7 +348,7 @@ router.post('/products', async (req, res) => {
         res.json(newProduct.rows[0]);
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 
@@ -383,7 +383,7 @@ router.put('/products/:id', async (req, res) => {
         res.json(updatedProduct.rows[0]);
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 
@@ -395,7 +395,7 @@ router.delete('/products/:id', async (req, res) => {
         res.json({ message: "Product deleted successfully." });
     } catch (err) {
         console.error(err.message);
-        res.status(500).send("Server Error");
+        res.status(500).json({ message: "Server Error" });
     }
 });
 

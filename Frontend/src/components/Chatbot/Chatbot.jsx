@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import './Chatbot.css';
 import { FaPaperPlane, FaTimes, FaPills, FaBook } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
+import API from '../../config/api';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 // Keep at most this many turns (user + bot pairs) in memory for context
@@ -67,7 +68,7 @@ const Chatbot = ({ onClose }) => {
       const controller  = new AbortController();
       const timeoutId   = setTimeout(() => controller.abort(), 45000); // 45s timeout
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat`, {
+      const response = await fetch(`${API}/api/chat`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({

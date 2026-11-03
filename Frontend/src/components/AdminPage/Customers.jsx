@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaUserPlus, FaSearch, FaEdit, FaTrash, FaUserSlash, FaUserCheck } from 'react-icons/fa';
 import './Customers.css';
+import API from '../../config/api';
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
@@ -12,7 +13,7 @@ const Customers = () => {
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`);
+      const response = await fetch(`${API}/api/admin/users`);
       if (!response.ok) {
         throw new Error('Failed to fetch customers');
       }
@@ -33,7 +34,7 @@ const Customers = () => {
   // Function to handle blocking a user
   const handleBlock = async (customerId) => {
     try {
-      await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users/${customerId}/block`, { method: 'PUT' });
+      await fetch(`${API}/api/admin/users/${customerId}/block`, { method: 'PUT' });
       // Update the user's status in the local state for an immediate UI update
       setCustomers(customers.map(cust => 
         cust.id === customerId ? { ...cust, is_blocked: true } : cust
@@ -46,7 +47,7 @@ const Customers = () => {
   // Function to handle unblocking a user
   const handleUnblock = async (customerId) => {
     try {
-      await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users/${customerId}/unblock`, { method: 'PUT' });
+      await fetch(`${API}/api/admin/users/${customerId}/unblock`, { method: 'PUT' });
       // Update the user's status in the local state
       setCustomers(customers.map(cust => 
         cust.id === customerId ? { ...cust, is_blocked: false } : cust
